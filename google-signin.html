@@ -21,27 +21,15 @@ limitations under the License.
 <link rel="import" href="../paper-ripple/paper-ripple.html">
 <link rel="import" href="../paper-material/paper-material.html">
 <link rel="import" href="../iron-flex-layout/iron-flex-layout-classes.html">
+<link rel="import" href="../iron-meta/iron-meta.html">
 <link rel="import" href="google-icons.html">
 <link rel="import" href="google-signin-styles.html">
 
 <dom-module id="google-signin">
   <template>
     <style include="google-signin-styles iron-positioning"></style>
+    <iron-meta id="aware" type="google-signin"></iron-meta>
 
-    <google-signin-aware id="aware"
-      app-package-name="{{appPackageName}}"
-      client-id="{{clientId}}"
-      cookie-policy="{{cookiePolicy}}"
-      request-visible-actions="{{requestVisibleActions}}"
-      hosted-domain="{{hostedDomain}}"
-      offline="{{offline}}"
-      offline-always-prompt="{{offlineAlwaysPrompt}}"
-      scopes="{{scopes}}"
-      openid-prompt="{{openidPrompt}}"
-      signed-in="{{signedIn}}"
-      is-authorized="{{isAuthorized}}"
-      need-additional-auth="{{needAdditionalAuth}}"
-      has-plus-scopes="{{hasPlusScopes}}"></google-signin-aware>
     <template is="dom-if" if="{{raised}}">
       <paper-material id="shadow" class="fit" elevation="2" animated></paper-material>
     </template>
@@ -246,15 +234,6 @@ any apps you're building. See the Google Developers Console
 
       properties: {
         /**
-         * App package name for android over-the-air installs.
-         * See the relevant [docs](https://developers.google.com/+/web/signin/android-app-installs)
-         */
-        appPackageName: {
-          type: String,
-          value: ''
-        },
-
-        /**
          * The brand being used for logo and styling.
          *
          * @default 'google'
@@ -268,26 +247,6 @@ any apps you're building. See the Google Developers Console
         _brand: {
           type: String,
           computed: '_computeBrand(brand, hasPlusScopes)'
-        },
-
-        /**
-         * a Google Developers clientId reference
-         */
-        clientId: {
-          type: String,
-          value: ''
-        },
-
-        /**
-         * The cookie policy defines what URIs have access to the session cookie
-         * remembering the user's sign-in state.
-         * See the relevant [docs](https://developers.google.com/+/web/signin/reference#determining_a_value_for_cookie_policy) for more information.
-         *
-         * @default 'single_host_origin'
-         */
-        cookiePolicy: {
-          type: String,
-          value: ''
         },
 
         /**
@@ -358,56 +317,10 @@ any apps you're building. See the Google Developers Console
         },
 
         /**
-         * The Google Apps domain to which users must belong to sign in.
-         * See the relevant [docs](https://developers.google.com/identity/sign-in/web/reference) for more information.
-         */
-        hostedDomain: {
-          type: String,
-          value: ''
-        },
-
-        /**
-         * Allows for offline `access_token` retrieval during the signin process.
-         */
-        offline: {
-          type: Boolean,
-          value: false
-        },
-
-        /**
-         * Forces a re-prompt, even if the user has already granted offline
-         * access to your application in the past. You only need one of
-         * `offline` and `offlineAlwaysPrompt`.
-         */
-        offlineAlwaysPrompt: {
-          type: Boolean,
-          value: false
-        },
-
-        /**
          * The scopes to provide access to (e.g https://www.googleapis.com/auth/drive)
          * and should be space-delimited.
          */
         scopes: {
-          type: String,
-          value: ''
-        },
-
-        /**
-         * Space-delimited, case-sensitive list of strings that
-         * specifies whether the the user is prompted for reauthentication
-         * and/or consent. The defined values are:
-         *   none: do not display authentication or consent pages.
-         *     This value is mutually exclusive with the rest.
-         *   login: always prompt the user for reauthentication.
-         *   consent: always show consent screen.
-         *   select_account: always show account selection page.
-         *     This enables a user who has multiple accounts to select amongst
-         *     the multiple accounts that they might have current sessions for.
-         * For more information, see "prompt" parameter description in
-         * https://openid.net/specs/openid-connect-basic-1_0.html#RequestParameters
-         */
-        openidPrompt: {
           type: String,
           value: ''
         },
@@ -551,11 +464,17 @@ any apps you're building. See the Google Developers Console
         }
       },
 
+      ready: function() {
+        if (this.$.aware.byKey('aware')) {
+          this.aware = this.$.aware.byKey('aware');
+        }
+      },
+
       /** Sign in user. Opens the authorization dialog for signing in.
        * The dialog will be blocked by a popup blocker unless called inside click handler.
        */
       signIn: function () {
-        this.$.aware.signIn();
+        this.aware.signIn();
       },
 
       _signInKeyPress: function (e) {
@@ -568,7 +487,7 @@ any apps you're building. See the Google Developers Console
       /** Sign out the user */
       signOut: function () {
         this.fire('google-signout-attempted');
-        this.$.aware.signOut();
+        this.aware.signOut();
       },
 
       _signOutKeyPress: function (e) {

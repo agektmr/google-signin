@@ -16,6 +16,7 @@ limitations under the License.
 
 <link rel="import" href="../polymer/polymer.html">
 <link rel="import" href="../google-apis/google-js-api.html">
+<link rel="import" href="../iron-meta/iron-meta.html">
 
 <script>
   (function() {
@@ -226,7 +227,7 @@ limitations under the License.
        * array of <google-signin-aware>
        * state changes are broadcast to them
        */
-      signinAwares: [],
+      signinAware: null,
 
       init: function() {
         this._apiLoader = document.createElement('google-js-api');
@@ -265,9 +266,7 @@ limitations under the License.
         var isSignedIn = newPrimaryUser.isSignedIn();
         if (isSignedIn != this._signedIn) {
           this._signedIn = isSignedIn;
-          for (var i=0; i<this.signinAwares.length; i++) {
-            this.signinAwares[i]._setSignedIn(isSignedIn);
-          }
+          this.signinAware._updateSignedInStatus(newPrimaryUser);
         }
 
         // update granted scopes
@@ -277,15 +276,11 @@ limitations under the License.
         this.updateAdditionalAuth();
 
         var response = newPrimaryUser.getAuthResponse();
-        for (var i=0; i<this.signinAwares.length; i++) {
-          this.signinAwares[i]._updateScopeStatus(response);
-        }
+        this.signinAware._updateScopeStatus(response);
       },
 
       setOfflineCode: function(code) {
-        for (var i=0; i<this.signinAwares.length; i++) {
-          this.signinAwares[i]._updateOfflineCode(code);
-        }
+        this.signinAware._updateOfflineCode(code);
       },
 
       /** convert scope string to scope array */
@@ -358,9 +353,8 @@ limitations under the License.
         }
         if (this._needAdditionalAuth != needMoreAuth) {
           this._needAdditionalAuth = needMoreAuth;
-          // broadcast new value
-          for (var i=0; i<this.signinAwares.length; i++) {
-            this.signinAwares[i]._setNeedAdditionalAuth(needMoreAuth);
+          if (this.signinAware) {
+            this.signinAware._setNeedAdditionalAuth(needMoreAuth);
           }
         }
       },
@@ -375,9 +369,7 @@ limitations under the License.
         }
         if (this._hasPlusScopes != hasPlusScopes) {
           this._hasPlusScopes = hasPlusScopes;
-          for (var i=0; i<this.signinAwares.length; i++) {
-            this.signinAwares[i]._setHasPlusScopes(hasPlusScopes);
-          }
+          this.signinAware._setHasPlusScopes(hasPlusScopes);
         }
       },
       /**
@@ -385,21 +377,20 @@ limitations under the License.
        * @param {!GoogleSigninAwareElement} aware element to add
        */
       attachSigninAware: function(aware) {
-        if (this.signinAwares.indexOf(aware) == -1) {
-          this.signinAwares.push(aware);
+        if (!this.signinAware) {
+          this.signinAware = aware;
           // Initialize aware properties
           aware._setNeedAdditionalAuth(this._needAdditionalAuth);
           aware._setSignedIn(this._signedIn);
           aware._setHasPlusScopes(this._hasPlusScopes);
         } else {
-          console.warn('signinAware attached more than once', aware);
+          console.error('More than one signinAware exists', aware);
         }
       },
 
       detachSigninAware: function(aware) {
-        var index = this.signinAwares.indexOf(aware);
-        if (index != -1) {
-          this.signinAwares.splice(index, 1);
+        if (this.signinAware) {
+          delete this.signinAware;
         } else {
           console.warn('Trying to detach unattached signin-aware');
         }
@@ -462,7 +453,7 @@ limitations under the License.
           // distinguish between a first auth and an additional one.
           promise = gapi.auth2.getAuthInstance().grantOfflineAccess(params);
         }
-        promise.then(
+        return promise.then(
           function onFulfilled(response) {
             // If login was offline, response contains one string "code"
             // Otherwise it contains the user object already
@@ -477,13 +468,12 @@ limitations under the License.
 
             var authResponse = newUser.getAuthResponse();
             // Let the current user listener trigger the changes.
+            return authResponse;
           },
           function onRejected(error) {
             // Access denied is not an error, user hit cancel
             if ("Access denied." !== error.reason) {
-              this.signinAwares.forEach(function(awareInstance) {
-                awareInstance.errorNotify(error);
-              });
+              this.signinAware.errorNotify(error);
             }
           }.bind(this)
         );
@@ -492,7 +482,7 @@ limitations under the License.
       /** signs user out */
       signOut: function() {
         this.assertAuthInitialized();
-        gapi.auth2.getAuthInstance().signOut().then(
+        return gapi.auth2.getAuthInstance().signOut().then(
           function onFulfilled() {
           // Let the current user listener trigger the changes.
           },
@@ -721,6 +711,10 @@ You can bind to `isAuthorized` property to monitor authorization state.
         }
       },
 
+      ready: function() {
+        new Polymer.IronMeta({type: 'google-signin', key: 'aware', value: this});
+      },
+
       attached: function() {
         AuthEngine.attachSigninAware(this);
       },
@@ -731,12 +725,12 @@ You can bind to `isAuthorized` property to monitor authorization state.
 
       /** pops up the authorization dialog */
       signIn: function(id) {
-        AuthEngine.signIn(id);
+        return AuthEngine.signIn(id);
       },
 
       /** signs user out */
       signOut: function() {
-        AuthEngine.signOut();
+        return AuthEngine.signOut();
       },
 
       errorNotify: function(error) {
@@ -778,6 +772,14 @@ You can bind to `isAuthorized` property to monitor authorization state.
 
       _openidPromptChanged: function(newVal, oldVal) {
         AuthEngine.openidPrompt = newVal;
+      },
+
+      _updateSignedInStatus: function(user) {
+        var isSignedIn = user.isSignedIn();
+        if (isSignedIn != this.signedIn) {
+          this._setSignedIn(isSignedIn);
+          this.fire('google-signin-authn-success', user);
+        }
       },
 
       _updateScopeStatus: function(user) {
